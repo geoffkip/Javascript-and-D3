@@ -154,6 +154,36 @@ var label = chartGroup.append("text")
     	    .call(position)
     	    .sort(order);
 
+
+          //Initiate the voronoi function
+        	//Use the same variables of the data in the .x and .y as used in the cx and cy
+        	//of the dot call
+
+           var voronoi = d3.voronoi()
+        		.x(function(d) { return xScale(x(d)); })
+        		.y(function(d) { return yScale(y(d)); })
+        		.extent([[0, 0], [width, height]]);
+
+        	var voronoiTiling =  chartGroup.selectAll("path")
+        	    .data(voronoi(interpolateData(1800))) //Use voronoi() with your dataset inside
+        	    .enter().append("path")
+        	    .attr("d", function(d, i) {return "M" + d.join("L") + "Z"; })
+        	    .datum(function(d, i) { return d.point; })
+        	//give each cell a unique id where the unique part corresponds to the dot ids
+        	//id is country name modulo spaces commas and fullstops
+        	    .attr("id", function(d,i) { return "voronoi" + d.name.replace(/\s/g, '')
+        					.replace(/\./g,'')
+        					.replace(/\,/g,'')
+        					.replace(/\'/g,''); })
+        	    .style("stroke", "rgb(0,128,128)")
+        	    .style("visibility", d3.select("input").property("checked") ? "hidden" : "visible" )
+        	    .style("fill", "none")
+        	    .style("opacity", 0.5)
+        	    .style("pointer-events", "all")
+        	    .on("mouseover", showTooltip)
+        	    .on("mouseout", removeTooltip);
+
+
           // Add a title.
         	dot.append("title")
         	    .text(function(d) { return d.name; });
@@ -170,7 +200,7 @@ var label = chartGroup.append("text")
             		.on("mouseover", enableInteraction);
 
             	// Start a transition that interpolates the data based on year.
-            	svg.transition()
+            	chartGroup.transition()
             	    .duration(30000)
             	    .ease("linear")
             	    .tween("year", tweenYear) // remove semicolon if you uncomment below!!!
@@ -197,6 +227,99 @@ var label = chartGroup.append("text")
                     .style("fill", colorScale(color(d)));
 
                   }
+
+                  function removeTooltip(d, i) {
+                	    d3.selectAll(".dot").style("opacity", 1);
+                	    d3.select("#countryname").remove();
+                	}
+
+                	function tweenYear() {
+                	    var year = d3.interpolateNumber(1800, 2009);
+                	    return function(t) { displayYear(year(t)); };
+                	}
+
+                	// Updates the display to show the specified year.
+                	function displayYear(year) {
+                	    // we use a key function to reduce the number of DOM modifications:
+                	    // it allows us to reorder DOM elements in the update selection rather than
+                	    // regenerating them
+                	    //for more information see Mike Bostock's post on Object Constancy
+                	    //https://bost.ocks.org/mike/constancy/
+                	    //or the answer to this stackoverflow question:
+                	    //http://stackoverflow.com/questions/24175624/d3-key-function
+
+                	    dot.data(interpolateData(year), key).call(position).sort(order);
+                	    label.text(Math.round(year));
+
+                	    //redraw voronoi
+                	    d3.selectAll("path").remove();
+                	    //		voronoiTiling.data(voronoi(interpolateData(year)));
+                	   chartGroup.selectAll("path")
+                		.data(voronoi(interpolateData(year))) //Use voronoi() with your dataset inside
+                		.enter().append("path")
+                		.attr("d", function(d, i) {return "M" + d.join("L") + "Z"; })
+                		.datum(function(d, i) { return d.point; })
+                	    //give each cell a unique id where the unique part corresponds to the dot ids
+                		.attr("id", function(d,i) { return "voronoi" + d.name.replace(/\s/g, '').replace(/\./g,'').replace(/\,/g,''); })
+                		.style("stroke", "rgb(0,128,128)")
+                		.style("visibility", d3.select("input").property("checked") ? "hidden" : "visible" )
+                		.style("fill", "none")
+                		.style("opacity", 0.5)
+                		.style("pointer-events", "all")
+                		.on("mouseover", showTooltip)
+                		.on("mouseout", removeTooltip);
+                	}
+
+                  // After the transition finishes, you can mouseover to change the year.
+                  function enableInteraction() {
+                      var yearScale = d3.scaleLinear()
+                        .domain([1800, 2009])
+                        .range([box.x + 10, box.x + box.width - 10])
+                        .clamp(true);
+
+                      // Cancel the current transition, if any.
+                      chartGroup.transition().duration(0);
+
+                      overlay
+                    .on("mouseover", mouseover)
+                    .on("mouseout", mouseout)
+                    .on("mousemove", mousemove)
+                    .on("touchmove", mousemove);
+
+                      function mouseover() {
+                    label.classed("active", true);
+                      }
+
+                      function mouseout() {
+                    label.classed("active", false);
+                      }
+
+                      function mousemove() {
+                    displayYear(yearScale.invert(d3.mouse(this)[0]));
+                      }
+                  }
+
+
+                  d3.select("input").on("change", change);
+
+
+                  function change() {
+                      this.checked ? svg.selectAll("path").style("visibility", "hidden")
+                    : chartGroup.selectAll("path").style("visibility", "visible");
+                  }
+
+                  var div = d3.select("body").append("div")
+                      .attr("id", "introtext")
+                      .attr("class", "explan-text")
+                      .style("display", "inline")
+                      .style("color", "black")
+                      .style("left", 50 + "px")
+                      .style("top", 510 + "px")
+                      .style("font-family", "Helvetica Neue")
+                      .style("font-size", "13px")
+
+                  ;
+
 
 
 
